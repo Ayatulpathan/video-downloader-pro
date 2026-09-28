@@ -6,7 +6,6 @@ export function isDirectDownloadableUrl(urlStr: string): boolean {
   try {
     const url = new URL(urlStr, window.location.href);
     const protocol = url.protocol.toLowerCase();
-    // Chrome downloads API works with http, https, data, blob
     return protocol === "http:" || protocol === "https:" || protocol === "data:";
   } catch {
     return false;
@@ -14,7 +13,17 @@ export function isDirectDownloadableUrl(urlStr: string): boolean {
 }
 
 export function detectDrmOrProtected(element: HTMLVideoElement, urlStr?: string): { isProtected: boolean; reason?: string } {
-  // Check HTML5 MediaKeys API presence on the element
+  const host = window.location.hostname.toLowerCase();
+
+  // 1. YouTube specific restriction & policy check
+  if (host.includes("youtube.com") || host.includes("youtu.be")) {
+    return {
+      isProtected: true,
+      reason: "YouTube video stream detected. YouTube uses chunked MediaSource streams (Blob/MSE), and Chrome Web Store policy strictly restricts downloading from YouTube.",
+    };
+  }
+
+  // 2. Check HTML5 MediaKeys API presence (Encrypted Media Extensions)
   if ((element as any).mediaKeys) {
     return {
       isProtected: true,
@@ -22,7 +31,7 @@ export function detectDrmOrProtected(element: HTMLVideoElement, urlStr?: string)
     };
   }
 
-  // Check URL patterns for DRM licensing endpoints or manifests
+  // 3. Check URL patterns for DRM licensing endpoints
   if (urlStr) {
     const lower = urlStr.toLowerCase();
     if (lower.includes("widevine") || lower.includes("playready") || lower.includes("fairplay") || lower.includes("clearkey")) {
@@ -42,7 +51,6 @@ export function extractMediaSourcesFromVideo(videoEl: HTMLVideoElement): Detecte
 
   const addSource = (rawUrl: string, mimeType?: string, sourceWidth?: number, sourceHeight?: number) => {
     if (!rawUrl || rawUrl.startsWith("blob:") || rawUrl.startsWith("mediasource:")) {
-      // Note: Blob/MediaSource streams that are chunked buffer streams are not direct standalone files
       return;
     }
 
@@ -87,7 +95,6 @@ export function extractMediaSourcesFromVideo(videoEl: HTMLVideoElement): Detecte
   childSources.forEach((sourceEl) => {
     const src = sourceEl.getAttribute("src") || sourceEl.src;
     const type = sourceEl.getAttribute("type") || "";
-    // Check if source element has res or size attributes
     const resAttr = sourceEl.getAttribute("data-quality") || sourceEl.getAttribute("size") || "";
     let sWidth = 0;
     let sHeight = 0;
@@ -108,6 +115,102 @@ export function extractMediaSourcesFromVideo(videoEl: HTMLVideoElement): Detecte
   }
 
   return sortQualities(sources);
+}
+
+// 5. Extract video links from metadata (OpenGraph, Twitter cards, JSON-LD)
+export function extractVideosFromPageMetadata(): DetectedMediaSource[] {
+  const sources: DetectedMediaSource[] = [];
+  const seenUrls = new Set<string>();
+
+  const addUrl = (urlStr: string | null | undefined, mimeType?: string) => {
+    if (!urlStr || !isDirectDownloadableUrl(urlStr)) return;
+    try {
+      const canonical = new URL(urlStr, window.location.href).href;
+      if (seenUrls.has(canonical)) return;
+      seenUrls.add(canonical);
+
+      const format = detectFormatFromMimeOrUrl(mimeType, canonical);
+      const qualityInfo = determineQuality(0, 0, canonical);
+      sources.push({
+        url: canonical,
+        format,
+        quality: qualityInfo.label,
+        qualityRank: qualityInfo.rank,
+        width: 0,
+        height: 0,
+        mimeType,
+      });
+    } catch {
+      // Ignore
+    }
+  };
+
+  // OpenGraph meta tags
+  const ogVideo = document.querySelector('meta[property="og:video"]')?.getAttribute("content");
+  const ogVideoUrl = document.querySelector('meta[property="og:video:url"]')?.getAttribute("content");
+  const ogVideoSecure = document.querySelector('meta[property="og:video:secure_url"]')?.getAttribute("content");
+  const ogType = document.querySelector('meta[property="og:video:type"]')?.getAttribute("content") || undefined;
+
+  addUrl(ogVideo, ogType);
+  addUrl(ogVideoUrl, ogType);
+  addUrl(ogVideoSecure, ogType);
+
+  // Twitter cards
+  const twitterStream = document.querySelector('meta[name="twitter:player:stream"]')?.getAttribute("content");
+  addUrl(twitterStream);
+
+  // Schema.org JSON-LD
+  const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+  scripts.forEach((script) => {
+    try {
+      const data = JSON.parse(script.textContent || "{}");
+      const scanObject = (obj: any) => {
+        if (!obj || typeof obj !== "object") return;
+        if (obj["@type"] === "VideoObject" || obj.contentUrl || obj.embedUrl) {
+          if (obj.contentUrl) addUrl(obj.contentUrl);
+        }
+        Object.values(obj).forEach(scanObject);
+      };
+      scanObject(data);
+    } catch {
+      // Ignore malformed JSON
+    }
+  });
+
+  return sources;
+}
+
+// 6. Sniff video network requests from Performance Resource Timing API
+export function extractVideosFromPerformance(): DetectedMediaSource[] {
+  const sources: DetectedMediaSource[] = [];
+  if (typeof window === "undefined" || !window.performance?.getEntriesByType) return sources;
+
+  const entries = window.performance.getEntriesByType("resource") as PerformanceResourceTiming[];
+  const videoRegex = /\.(mp4|webm|ogg|mov|m4v)(\?.*)?$/i;
+
+  entries.forEach((entry) => {
+    const name = entry.name;
+    if (name && videoRegex.test(name) && isDirectDownloadableUrl(name)) {
+      try {
+        const canonical = new URL(name, window.location.href).href;
+        const format = detectFormatFromMimeOrUrl(undefined, canonical);
+        const qualityInfo = determineQuality(0, 0, canonical);
+        sources.push({
+          url: canonical,
+          format,
+          quality: qualityInfo.label,
+          qualityRank: qualityInfo.rank,
+          width: 0,
+          height: 0,
+          sizeBytes: entry.decodedBodySize > 0 ? entry.decodedBodySize : undefined,
+        });
+      } catch {
+        // Ignore
+      }
+    }
+  });
+
+  return sources;
 }
 
 export function scanPageForMedia(): DetectedVideoItem[] {
@@ -139,6 +242,7 @@ export function scanPageForMedia(): DetectedVideoItem[] {
     const duration = isFinite(videoEl.duration) && videoEl.duration > 0 ? videoEl.duration : undefined;
     const poster = videoEl.poster || undefined;
 
+    // Check if DRM or protected streaming platform (like YouTube)
     if (drmCheck.isProtected) {
       items.push({
         id: `protected_video_${index}_${Date.now()}`,
@@ -151,8 +255,8 @@ export function scanPageForMedia(): DetectedVideoItem[] {
           format: "unknown",
           quality: "Unknown",
           qualityRank: 0,
-          width: 0,
-          height: 0,
+          width: videoEl.videoWidth || 0,
+          height: videoEl.videoHeight || 0,
         },
         isProtected: true,
         protectedReason: drmCheck.reason,
@@ -163,8 +267,8 @@ export function scanPageForMedia(): DetectedVideoItem[] {
       return;
     }
 
+    // Direct sources found on HTML5 video element
     if (sources.length > 0) {
-      // Check if primary source already captured to prevent duplicate video cards
       const primaryUrl = sources[0].url;
       if (!processedUrls.has(primaryUrl)) {
         processedUrls.add(primaryUrl);
@@ -174,16 +278,72 @@ export function scanPageForMedia(): DetectedVideoItem[] {
           pageUrl,
           pageTitle,
           sources,
-          bestSource: sources[0], // Already sorted by quality rank
+          bestSource: sources[0],
           thumbnailUrl: poster,
           durationSeconds: duration,
           timestamp: Date.now(),
         });
       }
+    } else if (videoEl.currentSrc?.startsWith("blob:") || videoEl.src?.startsWith("blob:")) {
+      // Blob/MSE video on custom site
+      items.push({
+        id: `blob_video_${index}_${Date.now()}`,
+        title: videoTitle,
+        pageUrl,
+        pageTitle,
+        sources: [],
+        bestSource: {
+          url: "",
+          format: "unknown",
+          quality: videoEl.videoHeight ? `${videoEl.videoHeight}p` as any : "Unknown",
+          qualityRank: 0,
+          width: videoEl.videoWidth || 0,
+          height: videoEl.videoHeight || 0,
+        },
+        isProtected: true,
+        protectedReason: "MediaSource (Blob) stream detected. This video is dynamically buffered in chunks and cannot be downloaded directly.",
+        thumbnailUrl: poster,
+        durationSeconds: duration,
+        timestamp: Date.now(),
+      });
     }
   });
 
-  // 2. Scan direct video links (<a> tags linking directly to .mp4, .webm, etc.)
+  // 2. Scan metadata video sources (OpenGraph / JSON-LD)
+  const metaSources = extractVideosFromPageMetadata();
+  metaSources.forEach((src, idx) => {
+    if (!processedUrls.has(src.url)) {
+      processedUrls.add(src.url);
+      items.push({
+        id: `meta_video_${idx}_${Date.now()}`,
+        title: `${pageTitle} (Embedded Stream)`,
+        pageUrl,
+        pageTitle,
+        sources: [src],
+        bestSource: src,
+        timestamp: Date.now(),
+      });
+    }
+  });
+
+  // 3. Scan Network Performance entries for loaded videos
+  const perfSources = extractVideosFromPerformance();
+  perfSources.forEach((src, idx) => {
+    if (!processedUrls.has(src.url)) {
+      processedUrls.add(src.url);
+      items.push({
+        id: `perf_video_${idx}_${Date.now()}`,
+        title: `${pageTitle} - Stream ${idx + 1}`,
+        pageUrl,
+        pageTitle,
+        sources: [src],
+        bestSource: src,
+        timestamp: Date.now(),
+      });
+    }
+  });
+
+  // 4. Scan direct video links (<a> tags linking directly to .mp4, .webm, etc.)
   const directLinks = document.querySelectorAll<HTMLAnchorElement>("a[href]");
   const videoExtRegex = /\.(mp4|webm|ogg|mov|m4v)(\?.*)?$/i;
 

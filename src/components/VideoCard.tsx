@@ -22,15 +22,33 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     return (
       <div className="card card-protected">
         <div className="card-header">
-          <div className="flex items-start gap-2">
-            <ShieldAlert className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-            <div>
-              <h3 className="card-title text-amber-300 font-semibold">{video.title}</h3>
-              <p className="text-xs text-zinc-400 mt-1">
-                {video.protectedReason || "Protected media detected. DRM streams cannot be downloaded."}
-              </p>
+          <div className="flex items-start gap-2.5">
+            <div className="card-thumbnail-icon bg-amber-950/30 border-amber-800/40">
+              <ShieldAlert className="w-4 h-4 text-amber-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="card-title text-amber-200" title={video.title}>
+                {video.title}
+              </h3>
+              <div className="card-badges">
+                <span className="badge badge-protected">Protected Stream / Policy</span>
+                {video.bestSource.width > 0 && video.bestSource.height > 0 && (
+                  <span className="badge badge-dim">
+                    {video.bestSource.width}×{video.bestSource.height}
+                  </span>
+                )}
+                {video.durationSeconds && (
+                  <span className="badge badge-duration">
+                    <Clock className="w-3 h-3 mr-1 inline" />
+                    {formatDuration(video.durationSeconds)}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
+        </div>
+        <div className="p-2.5 bg-amber-950/20 rounded-lg border border-amber-900/30 text-xs text-amber-300/90 leading-relaxed mt-2">
+          {video.protectedReason || "This video stream is protected by DRM or store policy and cannot be downloaded."}
         </div>
       </div>
     );

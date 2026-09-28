@@ -19,7 +19,7 @@ function performScanAndNotify() {
   }
 }
 
-function scheduleScan(delay = 500) {
+function scheduleScan(delay = 400) {
   if (scanTimeout !== null) {
     window.clearTimeout(scanTimeout);
   }
@@ -36,10 +36,17 @@ if (document.readyState === "loading") {
   scheduleScan(200);
 }
 
-// Also scan on window load and when video events fire
+// Also scan on window load, SPA navigation, and when video events fire
 window.addEventListener("load", () => scheduleScan(400));
 document.addEventListener("play", () => scheduleScan(100), true);
+document.addEventListener("playing", () => scheduleScan(100), true);
 document.addEventListener("loadedmetadata", () => scheduleScan(100), true);
+document.addEventListener("loadeddata", () => scheduleScan(100), true);
+document.addEventListener("canplay", () => scheduleScan(100), true);
+
+// SPA navigation events (YouTube, Twitter, Facebook, etc.)
+window.addEventListener("popstate", () => scheduleScan(500));
+window.addEventListener("yt-navigate-finish", () => scheduleScan(500));
 
 // 2. MutationObserver for dynamically added videos
 const observer = new MutationObserver((mutations) => {
@@ -65,7 +72,7 @@ const observer = new MutationObserver((mutations) => {
   }
 
   if (shouldRescan) {
-    scheduleScan(600);
+    scheduleScan(400);
   }
 });
 
@@ -81,7 +88,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "REQUEST_SCAN") {
     const detected = scanPageForMedia();
     sendResponse({ videos: detected });
-    return false; // synchronous response
+    return false;
   }
   return false;
 });

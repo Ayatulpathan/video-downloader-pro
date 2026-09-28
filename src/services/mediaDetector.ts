@@ -216,6 +216,7 @@ export function extractVideosFromPerformance(): DetectedMediaSource[] {
 export function scanPageForMedia(): DetectedVideoItem[] {
   const items: DetectedVideoItem[] = [];
   const processedUrls = new Set<string>();
+  const seenProtectedTitles = new Set<string>();
 
   const pageTitle = document.title || "Video";
   const pageUrl = window.location.href;
@@ -236,7 +237,7 @@ export function scanPageForMedia(): DetectedVideoItem[] {
     if (!videoTitle && videoElements.length === 1) {
       videoTitle = pageTitle;
     } else if (!videoTitle) {
-      videoTitle = `${pageTitle} - Video ${index + 1}`;
+      videoTitle = pageTitle;
     }
 
     const duration = isFinite(videoEl.duration) && videoEl.duration > 0 ? videoEl.duration : undefined;
@@ -244,6 +245,12 @@ export function scanPageForMedia(): DetectedVideoItem[] {
 
     // Check if DRM or protected streaming platform (like YouTube)
     if (drmCheck.isProtected) {
+      // Deduplicate protected cards by title so preview player doesn't duplicate main player
+      if (seenProtectedTitles.has(videoTitle)) {
+        return;
+      }
+      seenProtectedTitles.add(videoTitle);
+
       items.push({
         id: `protected_video_${index}_${Date.now()}`,
         title: videoTitle,
@@ -286,6 +293,11 @@ export function scanPageForMedia(): DetectedVideoItem[] {
       }
     } else if (videoEl.currentSrc?.startsWith("blob:") || videoEl.src?.startsWith("blob:")) {
       // Blob/MSE video on custom site
+      if (seenProtectedTitles.has(videoTitle)) {
+        return;
+      }
+      seenProtectedTitles.add(videoTitle);
+
       items.push({
         id: `blob_video_${index}_${Date.now()}`,
         title: videoTitle,

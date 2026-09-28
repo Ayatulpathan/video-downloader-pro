@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && node scripts/build.js",
-    "generate-icons": "node scripts/generate-icons.js"
+    "generate-icons": "node scripts/generate-icons.js",
+    "test": "node --test tests/suite.test.js"
   },
   "dependencies": {
     "clsx": "^2.1.1",

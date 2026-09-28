@@ -1,4 +1,4 @@
-﻿import { VideoFormat } from "../types";
+import { VideoFormat } from "../types";
 
 const RESERVED_WINDOWS_NAMES = new Set([
   "CON", "PRN", "AUX", "NUL",
@@ -38,8 +38,8 @@ export function sanitizeFilename(
   // Collapse consecutive underscores or spaces
   baseName = baseName.replace(/[\s_]+/g, "_").trim();
 
-  // Strip trailing periods and spaces (illegal on Windows)
-  baseName = baseName.replace(/[. ]+$/, "");
+  // Strip trailing periods, underscores, and spaces (illegal or ugly on Windows)
+  baseName = baseName.replace(/[._ ]+$/, "");
 
   // Check reserved DOS device names
   const upper = baseName.toUpperCase();
@@ -49,7 +49,7 @@ export function sanitizeFilename(
 
   // Cap length to avoid MAX_PATH overflow (120 chars)
   if (baseName.length > 120) {
-    baseName = baseName.substring(0, 120).trim().replace(/[. ]+$/, "");
+    baseName = baseName.substring(0, 120).trim().replace(/[._ ]+$/, "");
   }
 
   const extension = format !== "unknown" ? `.${format}` : ".mp4";

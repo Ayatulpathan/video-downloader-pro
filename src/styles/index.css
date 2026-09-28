@@ -65,11 +65,42 @@ body {
 .popup-wrapper {
   width: 400px;
   min-height: 480px;
-  max-height: 580px;
+  max-height: 590px;
   display: flex;
   flex-direction: column;
   background-color: var(--bg-primary);
   overflow: hidden;
+  position: relative;
+}
+
+.popup-tabs {
+  display: flex;
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0 12px;
+}
+
+.popup-tab {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.popup-tab.active {
+  color: var(--accent-light);
+  border-bottom-color: var(--accent-primary);
 }
 
 .popup-content {
@@ -167,6 +198,7 @@ body {
   background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
   color: #ffffff;
   box-shadow: 0 2px 10px rgba(79, 70, 229, 0.35);
+  border: none;
 }
 
 .btn-highest-quality:hover:not(:disabled) {
@@ -276,7 +308,7 @@ body {
 }
 
 .card-header {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .card-thumbnail-icon {
@@ -387,6 +419,75 @@ body {
 .quality-select-dropdown option {
   background: var(--bg-card);
   color: var(--text-primary);
+}
+
+/* Embedded Player Modal */
+.embedded-player-modal {
+  background: #090d16;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  margin-bottom: 12px;
+}
+
+.embedded-player-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: #1e293b;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.embedded-player-frame-wrapper {
+  position: relative;
+  width: 100%;
+  padding-top: 56.25%; /* 16:9 Aspect Ratio */
+  background: #000;
+}
+
+.embedded-player-iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* Bookmarks */
+.bookmarks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bookmark-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.bookmark-thumb {
+  width: 48px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: #000;
+}
+
+.bookmark-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Downloads Section */

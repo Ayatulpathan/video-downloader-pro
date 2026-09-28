@@ -1,9 +1,11 @@
 ﻿import React, { useEffect, useState, useCallback } from "react";
-import { DetectedVideoItem, DetectedMediaSource, DownloadTask } from "../types";
+import { DetectedVideoItem, DetectedMediaSource, DownloadTask, YouTubeEmbedInfo, SavedBookmark } from "../types";
 import { Header } from "../components/Header";
 import { VideoCard } from "../components/VideoCard";
 import { DownloadProgress } from "../components/DownloadProgress";
 import { EmptyState, ErrorState } from "../components/EmptyState";
+import { EmbeddedPlayer } from "../components/EmbeddedPlayer";
+import { BookmarksList } from "../components/BookmarksList";
 import {
   getActiveTab,
   requestMediaRescan,
@@ -12,11 +14,20 @@ import {
   showDownloadItem,
   getDownloadTasks,
 } from "../services/chromeApi";
-import { getStoredSettings, getStoredVideosForTab } from "../utils/storage";
-import { Sparkles } from "lucide-react";
+import {
+  getStoredSettings,
+  getStoredVideosForTab,
+  getStoredBookmarks,
+  addStoredBookmark,
+  removeStoredBookmark,
+} from "../utils/storage";
+import { Sparkles, Video, Bookmark } from "lucide-react";
 
 export const Popup: React.FC = () => {
+  const [activeTabName, setActiveTabName] = useState<"media" | "bookmarks">("media");
   const [videos, setVideos] = useState<DetectedVideoItem[]>([]);
+  const [bookmarks, setBookmarks] = useState<SavedBookmark[]>([]);
+  const [activeEmbedInfo, setActiveEmbedInfo] = useState<YouTubeEmbedInfo | null>(null);
   const [downloadTasks, setDownloadTasks] = useState<DownloadTask[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [isStartingDownload, setIsStartingDownload] = useState(false);
@@ -42,6 +53,9 @@ export const Popup: React.FC = () => {
     try {
       const currentSettings = await getStoredSettings();
       applyTheme(currentSettings.theme);
+
+      const savedBookmarks = await getStoredBookmarks();
+      setBookmarks(savedBookmarks);
 
       const activeTab = await getActiveTab();
       if (activeTab?.id) {
@@ -72,7 +86,6 @@ export const Popup: React.FC = () => {
   useEffect(() => {
     loadData();
 
-    // Poll downloads periodically while popup is open
     const interval = setInterval(async () => {
       try {
         const tasks = await getDownloadTasks();
@@ -115,7 +128,6 @@ export const Popup: React.FC = () => {
       if (!res.success) {
         setErrorMessage(res.error || "Failed to trigger download");
       } else {
-        // Refresh task list
         const tasks = await getDownloadTasks();
         setDownloadTasks(tasks);
       }
@@ -145,18 +157,80 @@ export const Popup: React.FC = () => {
     await showDownloadItem(downloadId);
   };
 
+  const handleAddBookmark = async (video: DetectedVideoItem) => {
+    const isYouTube = video.pageUrl.includes("youtube.com") || video.pageUrl.includes("youtu.be");
+    const videoId = isYouTube
+      ? new URL(video.pageUrl).searchParams.get("v") || (video.pageUrl.split("/").pop() || "")
+      : "";
+
+    const newBookmark: SavedBookmark = {
+      id: `bm_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      title: video.title,
+      url: video.pageUrl,
+      thumbnailUrl: isYouTube
+        ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
+        : video.thumbnailUrl,
+      channelTitle: isYouTube ? "YouTube" : undefined,
+      addedAt: Date.now(),
+    };
+
+    const updated = await addStoredBookmark(newBookmark);
+    setBookmarks(updated);
+  };
+
+  const handleRemoveBookmark = async (id: string) => {
+    const updated = await removeStoredBookmark(id);
+    setBookmarks(updated);
+  };
+
+  const handlePlayBookmark = (bookmark: SavedBookmark) => {
+    const isYouTube = bookmark.url.includes("youtube.com") || bookmark.url.includes("youtu.be");
+    const videoId = isYouTube
+      ? new URL(bookmark.url).searchParams.get("v") || (bookmark.url.split("/").pop() || "")
+      : "";
+
+    if (videoId) {
+      setActiveEmbedInfo({
+        videoId,
+        title: bookmark.title,
+        authorName: bookmark.channelTitle || "Saved Video",
+        authorUrl: bookmark.url,
+        thumbnailUrl: bookmark.thumbnailUrl || "",
+        embedUrl: `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0`,
+      });
+    }
+  };
+
   const nonProtectedVideos = videos.filter((v) => !v.isProtected);
   const hasProtected = videos.some((v) => v.isProtected);
 
   return (
     <div className="popup-wrapper">
       <Header
-        videoCount={nonProtectedVideos.length}
+        videoCount={videos.length}
         isScanning={isScanning}
         onRefresh={handleRescan}
         onOpenSettings={handleOpenSettings}
         hasProtected={hasProtected}
       />
+
+      {/* Tabs */}
+      <div className="popup-tabs">
+        <button
+          onClick={() => setActiveTabName("media")}
+          className={`popup-tab ${activeTabName === "media" ? "active" : ""}`}
+        >
+          <Video className="w-3.5 h-3.5" />
+          <span>Detected ({videos.length})</span>
+        </button>
+        <button
+          onClick={() => setActiveTabName("bookmarks")}
+          className={`popup-tab ${activeTabName === "bookmarks" ? "active" : ""}`}
+        >
+          <Bookmark className="w-3.5 h-3.5" />
+          <span>Saved ({bookmarks.length})</span>
+        </button>
+      </div>
 
       {errorMessage && (
         <div className="p-3">
@@ -164,8 +238,8 @@ export const Popup: React.FC = () => {
         </div>
       )}
 
-      {/* Global Quick Action if multiple videos detected */}
-      {nonProtectedVideos.length > 1 && (
+      {/* Global Quick Action if multiple downloadable videos exist */}
+      {activeTabName === "media" && nonProtectedVideos.length > 1 && (
         <div className="quick-actions-bar">
           <button
             onClick={handleDownloadAllHighest}
@@ -180,19 +254,37 @@ export const Popup: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="popup-content">
-        {videos.length === 0 ? (
-          <EmptyState onScanAgain={handleRescan} isScanning={isScanning} />
+        {/* Floating Mini Player if active */}
+        {activeEmbedInfo && (
+          <EmbeddedPlayer
+            info={activeEmbedInfo}
+            onClose={() => setActiveEmbedInfo(null)}
+          />
+        )}
+
+        {activeTabName === "media" ? (
+          videos.length === 0 ? (
+            <EmptyState onScanAgain={handleRescan} isScanning={isScanning} />
+          ) : (
+            <div className="video-list">
+              {videos.map((video) => (
+                <VideoCard
+                  key={video.id}
+                  video={video}
+                  onDownload={handleDownload}
+                  onPlayEmbed={(info) => setActiveEmbedInfo(info)}
+                  onBookmark={handleAddBookmark}
+                  isDownloading={isStartingDownload}
+                />
+              ))}
+            </div>
+          )
         ) : (
-          <div className="video-list">
-            {videos.map((video) => (
-              <VideoCard
-                key={video.id}
-                video={video}
-                onDownload={handleDownload}
-                isDownloading={isStartingDownload}
-              />
-            ))}
-          </div>
+          <BookmarksList
+            bookmarks={bookmarks}
+            onPlay={handlePlayBookmark}
+            onRemove={handleRemoveBookmark}
+          />
         )}
 
         <DownloadProgress

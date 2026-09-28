@@ -15,11 +15,29 @@ export interface DetectedMediaSource {
   url: string;
   format: VideoFormat;
   quality: VideoQualityLabel;
-  qualityRank: number; // numeric value for sorting (2160, 1440, 1080, 720, 480, 360, 240, 144, 0)
+  qualityRank: number;
   width: number;
   height: number;
   mimeType?: string;
   sizeBytes?: number;
+}
+
+export interface YouTubeEmbedInfo {
+  videoId: string;
+  title: string;
+  authorName: string;
+  authorUrl: string;
+  thumbnailUrl: string;
+  embedUrl: string;
+}
+
+export interface SavedBookmark {
+  id: string;
+  title: string;
+  url: string;
+  thumbnailUrl?: string;
+  channelTitle?: string;
+  addedAt: number;
 }
 
 export interface DetectedVideoItem {
@@ -31,6 +49,7 @@ export interface DetectedVideoItem {
   bestSource: DetectedMediaSource;
   isProtected?: boolean;
   protectedReason?: string;
+  youtubeInfo?: YouTubeEmbedInfo;
   thumbnailUrl?: string;
   durationSeconds?: number;
   timestamp: number;
@@ -57,14 +76,3 @@ export interface UserSettings {
   autoDetect: boolean;
   theme: "system" | "light" | "dark";
 }
-
-export type ExtensionMessage =
-  | { type: "MEDIA_DETECTED"; videos: DetectedVideoItem[] }
-  | { type: "REQUEST_SCAN" }
-  | { type: "GET_CURRENT_VIDEOS" }
-  | { type: "VIDEOS_UPDATE"; videos: DetectedVideoItem[] }
-  | { type: "START_DOWNLOAD"; source: DetectedMediaSource; title: string }
-  | { type: "CANCEL_DOWNLOAD"; downloadId: number }
-  | { type: "SHOW_DOWNLOAD"; downloadId: number }
-  | { type: "GET_DOWNLOAD_TASKS" }
-  | { type: "DOWNLOAD_TASKS_UPDATE"; tasks: DownloadTask[] };

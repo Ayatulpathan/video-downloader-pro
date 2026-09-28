@@ -1,4 +1,4 @@
-﻿import { UserSettings, DetectedVideoItem, DownloadTask } from "../types";
+﻿import { UserSettings, DetectedVideoItem, DownloadTask, SavedBookmark } from "../types";
 
 export const DEFAULT_SETTINGS: UserSettings = {
   defaultQuality: "highest",
@@ -6,6 +6,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   autoDetect: true,
   theme: "system",
 };
+
+const BOOKMARKS_KEY = "saved_video_bookmarks";
 
 export async function getStoredSettings(): Promise<UserSettings> {
   if (typeof chrome !== "undefined" && chrome.storage?.local) {
@@ -56,4 +58,31 @@ export async function saveActiveDownloadTasks(tasks: DownloadTask[]): Promise<vo
   if (typeof chrome !== "undefined" && chrome.storage?.local) {
     await chrome.storage.local.set({ active_download_tasks: tasks });
   }
+}
+
+export async function getStoredBookmarks(): Promise<SavedBookmark[]> {
+  if (typeof chrome !== "undefined" && chrome.storage?.local) {
+    const data = await chrome.storage.local.get(BOOKMARKS_KEY);
+    return data[BOOKMARKS_KEY] || [];
+  }
+  return [];
+}
+
+export async function addStoredBookmark(bookmark: SavedBookmark): Promise<SavedBookmark[]> {
+  const current = await getStoredBookmarks();
+  const filtered = current.filter((b) => b.id !== bookmark.id);
+  const updated = [bookmark, ...filtered];
+  if (typeof chrome !== "undefined" && chrome.storage?.local) {
+    await chrome.storage.local.set({ [BOOKMARKS_KEY]: updated });
+  }
+  return updated;
+}
+
+export async function removeStoredBookmark(id: string): Promise<SavedBookmark[]> {
+  const current = await getStoredBookmarks();
+  const updated = current.filter((b) => b.id !== id);
+  if (typeof chrome !== "undefined" && chrome.storage?.local) {
+    await chrome.storage.local.set({ [BOOKMARKS_KEY]: updated });
+  }
+  return updated;
 }

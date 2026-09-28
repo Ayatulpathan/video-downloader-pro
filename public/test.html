@@ -1,0 +1,156 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Video Downloader Pro - Extension Test Suite</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 0 20px;
+      background: #0f172a;
+      color: #f8fafc;
+      line-height: 1.6;
+    }
+    h1 { color: #818cf8; margin-bottom: 8px; }
+    .test-section {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+    .test-title { font-size: 16px; font-weight: 700; color: #e2e8f0; margin-bottom: 12px; }
+    video { max-width: 100%; border-radius: 8px; background: #000; }
+    button {
+      background: #4f46e5;
+      color: #fff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button:hover { background: #4338ca; }
+    a.video-link {
+      color: #818cf8;
+      text-decoration: underline;
+      display: inline-block;
+      margin-top: 8px;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      background: #334155;
+      color: #94a3b8;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎬 Video Downloader Pro - Test Suite</h1>
+  <p style="color: #94a3b8; margin-bottom: 24px;">
+    Use this page to test all media detection, quality sorting, duplicate filtering, dynamic loading, and DRM detection scenarios.
+  </p>
+
+  <!-- Test 1: Single Standard MP4 Video -->
+  <div class="test-section">
+    <div class="test-title">Test 1: Single Standard MP4 Video (1080p)</div>
+    <span class="badge">Direct HTML5 Video</span>
+    <div>
+      <video width="480" height="270" controls title="Big Buck Bunny 1080p Sample">
+        <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4" data-quality="1080p">
+      </video>
+    </div>
+  </div>
+
+  <!-- Test 2: Multi-resolution & Multi-format video -->
+  <div class="test-section">
+    <div class="test-title">Test 2: Multiple Resolutions & Formats (1080p MP4, 720p MP4, 720p WebM)</div>
+    <span class="badge">Multi-Source</span>
+    <div>
+      <video width="480" height="270" controls title="Elephants Dream Multi-Quality">
+        <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4" type="video/mp4" data-quality="1080p">
+        <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" type="video/mp4" data-quality="720p">
+        <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4" type="video/mp4" data-quality="480p">
+      </video>
+    </div>
+  </div>
+
+  <!-- Test 3: Duplicate Resources Test -->
+  <div class="test-section">
+    <div class="test-title">Test 3: Duplicate Resources (Should deduplicate into single entry)</div>
+    <span class="badge">Deduplication</span>
+    <div>
+      <video width="480" height="270" controls title="Duplicate Stream Source">
+        <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4" type="video/mp4">
+        <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4" type="video/mp4">
+      </video>
+    </div>
+  </div>
+
+  <!-- Test 4: Dynamic Video Addition (MutationObserver Test) -->
+  <div class="test-section">
+    <div class="test-title">Test 4: Dynamically Loaded Video (Tests MutationObserver)</div>
+    <span class="badge">MutationObserver</span>
+    <p style="font-size: 13px; color: #94a3b8; margin-bottom: 12px;">
+      Click the button below to inject a video element into the DOM at runtime. The extension should detect it without refreshing the page.
+    </p>
+    <button id="add-video-btn">Add Dynamic Video to Page</button>
+    <div id="dynamic-container" style="margin-top: 16px;"></div>
+  </div>
+
+  <!-- Test 5: Direct Download Link Test -->
+  <div class="test-section">
+    <div class="test-title">Test 5: Standalone Video Link Anchor</div>
+    <span class="badge">Anchor Tag</span>
+    <div>
+      <a href="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4" class="video-link" title="For Bigger Joy Blazes 720p Direct Link">
+        ⬇ Direct Download Link: ForBiggerJoyBlazes.mp4
+      </a>
+    </div>
+  </div>
+
+  <!-- Test 6: Simulated Protected DRM Media -->
+  <div class="test-section">
+    <div class="test-title">Test 6: Protected / DRM Media Simulation</div>
+    <span class="badge">DRM Notice</span>
+    <div>
+      <video id="drm-video" width="480" height="270" controls title="Protected DRM Stream Mock">
+        <source src="https://example.com/widevine/license/stream.mpd" type="application/dash+xml">
+      </video>
+    </div>
+  </div>
+
+  <script>
+    // Test 4 Dynamic button handler
+    document.getElementById('add-video-btn').addEventListener('click', () => {
+      const container = document.getElementById('dynamic-container');
+      const v = document.createElement('video');
+      v.width = 480;
+      v.height = 270;
+      v.controls = true;
+      v.title = "Dynamically Added Video (Tears of Steel 720p)";
+      const s = document.createElement('source');
+      s.src = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4";
+      s.type = "video/mp4";
+      v.appendChild(s);
+      container.innerHTML = '';
+      container.appendChild(v);
+    });
+
+    // Test 6 Mock DRM property
+    const drmVideo = document.getElementById('drm-video');
+    if (drmVideo) {
+      Object.defineProperty(drmVideo, 'mediaKeys', {
+        value: { keySystem: "com.widevine.alpha" },
+        writable: true
+      });
+    }
+  </script>
+</body>
+</html>
